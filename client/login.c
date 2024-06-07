@@ -69,19 +69,18 @@ bool validateConfirm(char* password1, char*  password2, char* errormsg){
 }
 
 
-void getUsername(char* out, int row){
+int getUsername(char* out, int row){
     echo();
     char username[1024];
     char errormsg[50];
-
-    mvprintw(5, 0, "%d", is_keypad(stdscr));
+    int len;
 
     do{
         move(row, 0);
         clrtoeol();
         printw("Username: ");
-        int res = scanw("%s", username);
-        if(res == 0 || res == EOF){
+        len = getAlnumString(username, 25, 0);
+        if(len == 0){
             printerrmsg(stderrw, "Empty Username");
         }else if (validatePassword(username, errormsg)){
             break;
@@ -94,20 +93,23 @@ void getUsername(char* out, int row){
     stderrw != NULL && wclear(stderrw);
     wrefresh(stderrw);
     strcpy(out, username);
+
+    return len;
 }
 
-void getPassword(char* out, int row){
+int getPassword(char* out, int row){
     char password[1024];
     char errormsg[50];
     int i = 0;
+    int len;
 
     noecho();
     for(i = 0; i < MAX_ATTEMPTS; i++){
         move(row, 0);
         clrtoeol();
         printw("Password: ");
-        int res = scanw("%s", password);
-        if(res == 0 || res == EOF){
+        len = getAlnumString(password, 20, '*');
+        if(len == 0){
             printerrmsg(stderrw, "Empty Password");
         }else if (validatePassword(password, errormsg)){
             break;
@@ -126,6 +128,7 @@ void getPassword(char* out, int row){
     wrefresh(stderrw);
     strcpy(out, password);
     echo();
+    return len;
 
 }
 
@@ -139,8 +142,8 @@ void getConfirm(char* out, int row, char* password){
         move(row, 0);
         clrtoeol();
         printw("Confirm Password: ");
-        int res = scanw("%s", confirm);
-        if(res == 0 || res == EOF){
+        int len = getAlnumString(confirm, 20, '*');
+        if(len == 0){
             printerrmsg(stderrw, "Empty Password");
         }else if (validateConfirm(password, confirm, errormsg)){
             break;
@@ -149,7 +152,7 @@ void getConfirm(char* out, int row, char* password){
         }
     }
 
-    if(i < MAX_ATTEMPTS) {
+    if(i == MAX_ATTEMPTS) {
         endwin();
         printf("Max attempts reached\n");
         exit(1);
@@ -160,4 +163,23 @@ void getConfirm(char* out, int row, char* password){
     strcpy(out, confirm);
     echo();
 
+}
+
+void loginErrorHandler(LoginError code){
+    switch (code) {
+    case LOG_USERNAME_NOT_EXISTS:{
+        printerrmsg(stderrw, "Username not found");
+        break;
+    }
+    case LOG_WRONG_PASSWORD:{
+        printerrmsg(stderrw, "Wrong password");
+        break;
+    }
+    case REG_USERNAME_ALREDY_EXISTS:{
+        printerrmsg(stderrw, "Username already exists");
+        break;
+    }
+    default:
+        break;
+    }
 }

@@ -1,11 +1,14 @@
 #include "ncursesUI.h"
 #include <ncurses.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
 
 int wmenu(WINDOW *win, unsigned int chn, const char* chv[]){
+    noecho();
     bool isKeypad = is_keypad(win);
-    int prevCursorState = curs_set(0);
     keypad(win, TRUE);
+    int cursor = curs_set(0);
     int key;
     int c = 0;
 
@@ -36,9 +39,9 @@ int wmenu(WINDOW *win, unsigned int chn, const char* chv[]){
     }
 
     keypad(win, isKeypad);
-    curs_set(prevCursorState);
     wclear(win);
     wrefresh(win);
+    curs_set(cursor);
     return c;
 }
 
@@ -51,4 +54,38 @@ void printerrmsg(WINDOW* stderrw, char* msg){
     wrefresh(stderrw);
     mvwprintw(stderrw, 0, 0, "Error: %s", msg);
     wrefresh(stderrw);
+}
+
+int wgetAlnumString(WINDOW* win, char *out, int max, char echo){
+    int isKeypad = is_keypad(win);
+    char str[max + 1];
+    int i = 0;
+    int key;
+
+    noecho();
+    keypad(win, TRUE);
+
+    do{
+        key = wgetch(win);
+
+        if(i < max && isalnum(key)){
+            str[i++] = key;
+            str[i] = '\0';
+            waddch(win, echo == 0 ? key : echo);
+        } else if ((key == KEY_BACKSPACE || key == 127 || key == '\b') &&  i > 0) {
+            str[--i] = '\0';
+            wmove(win, getcury(win), getcurx(win) - 1);
+            wdelch(win);
+        } else if ((key == KEY_ENTER || key == '\n')){
+            break;
+        }
+    } while(1);
+
+    keypad(win, isKeypad);
+    strcpy(out, str);
+    return i;
+}
+
+int getAlnumString(char *out, int max, char echo){
+    return wgetAlnumString(stdscr, out, max, echo);
 }
