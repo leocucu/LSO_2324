@@ -10,6 +10,8 @@
 
 #include "ncursesUI.h"
 #include "login.h"
+#include "room.h"
+#include "chat.h"
 
 #define PORT 12345
 #define SERVER_IP "127.0.0.1"
@@ -121,6 +123,7 @@ int main(){
             break; 
         }
         case 1:{
+            //  Register
             char username[1024];
             char password[1024];
             char confirmp[1024];
@@ -143,7 +146,6 @@ int main(){
                 isLogged = true;
                 strcpy(client.username, username);
             }
-            //  Register
             break;
         }
         default:
@@ -156,90 +158,64 @@ int main(){
 
     clear();
     refresh();
+    flushinp();
 
     WINDOW* roomsMenu = newwin(5, col, 0, 0);
 
     do{
+
+        //  Rooms Menu
         const char *rooms[5] = {"ITA", "ENG", "FRA", "ESP", "Exit"};
         int selected = wmenu(roomsMenu, 5, rooms);
-        if(selected >= 0 && selected < 4){
-            char command[BUFFER_SIZE];
-            sprintf(command, "/r %d", selected);
-            write(sockfd, command, strlen(command));
-            client.room = selected;
-        } else {
+        if (selected >= 0 && selected < 4){
+            reqJoinRoom(sockfd, selected);
+
+            clear();
+            refresh();
+
+            waitInQueue(sockfd);
+        }
+        else{
             clearExit();
         }
 
+        //  Start Chatroom
         clear();
         refresh();
 
-        set_nonblocking(sockfd);
         WINDOW *inputwin = newwin(3, col, row - 4, 0);
         WINDOW *messagesboxwin = newwin(row - 6, col, 0, 0);
         WINDOW *messageswin = newwin(row - 8, col - 2, 1, 1);
+        set_nonblocking(sockfd);
 
-        nodelay(inputwin, TRUE);
-        scrollok(messageswin, TRUE);
-        wsetscrreg(messageswin, 0, getmaxy(messageswin));
-        keypad(stdscr, TRUE);
-        keypad(inputwin, TRUE);
-        refresh();
-
-        box(inputwin, 0, 0);
-        box(messagesboxwin, 0, 0);
-        refresh();
-        wmove(inputwin, 1, 1);
-        leaveok(stdscr, TRUE);
-        
-        wrefresh(inputwin);
-        wrefresh(messagesboxwin);
-        wrefresh(messageswin);
+        initChatWindows(messageswin, messagesboxwin, inputwin);
 
         char message_buffer[BUFFER_SIZE] = {0};
         char input_buffer[BUFFER_SIZE] = {0};
         int input_len = 0;
         int currentLine = 0;
+        flushinp();
 
         do{
             //  Read String char by char Non-Blocking Way
-            int ch = wgetch(inputwin);
-            if(ch != ERR){
-                if(ch == '\n' || ch == KEY_ENTER){
-                    write(sockfd, input_buffer, strlen(input_buffer));
-                    if(strcmp(input_buffer, "/exit") == 0){
-                        client.room = -1;
-                        break;
-                    }
-
-                    memset(input_buffer, 0, BUFFER_SIZE);
-                    input_len = 0;
-                } else if (ch == '\b' || ch == KEY_BACKSPACE || ch == 127){
-                    if (input_len > 0) {
-                        input_buffer[--input_len] = '\0';
-                    }
-                } else if (isprint(ch)){
-                    input_buffer[input_len++] = ch;
-                    input_buffer[input_len] = '\0';
+            if(getStringNonBlocking(inputwin, input_buffer, &input_len)){
+                write(sockfd, input_buffer, strlen(input_buffer));
+                if(strncmp(input_buffer, "/", 1) == 0){
+                    if(handleCommand(input_buffer) == 1) break;
                 }
+
+                inputClear(inputwin);
+                input_len = 0;
+                input_buffer[0] = '\0';
             }
 
-            // Read messages from server
+            // Read and print messages from server
             int n = read(sockfd, message_buffer, sizeof(message_buffer) - 1);
             if (n > 0) {
                 message_buffer[n] = '\0';
-                if(currentLine == getmaxy(messageswin)) currentLine--;
-                mvwprintw(messageswin, currentLine, 0, "%s", message_buffer);
-                currentLine++;
-                wrefresh(messageswin);
+                printMessage(messageswin, message_buffer, &currentLine);
             }
 
-            // Display input buffer
-            wclear(inputwin);
-            box(inputwin, 0, 0);
-            mvwprintw(inputwin, 1, 1, "%s", input_buffer);
-            usleep(5);
-            wrefresh(inputwin);
         } while(1);
 
         clear();
@@ -247,10 +223,9 @@ int main(){
         delwin(messageswin);
         delwin(messagesboxwin);
         refresh();
+
         toggle_nonblocking(sockfd);
     } while(1);
-    //  Lista stanze
-    //  Apertura chat
 
     endwin();
     close(sockfd);

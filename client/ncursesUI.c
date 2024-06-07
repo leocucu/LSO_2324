@@ -4,6 +4,8 @@
 #include <ctype.h>
 #include <string.h>
 
+extern WINDOW* stderrw;
+
 int wmenu(WINDOW *win, unsigned int chn, const char* chv[]){
     noecho();
     bool isKeypad = is_keypad(win);
@@ -52,7 +54,7 @@ int menu(unsigned int chn, const char* chv[]){
 void printerrmsg(WINDOW* stderrw, char* msg){
     wclear(stderrw);
     wrefresh(stderrw);
-    mvwprintw(stderrw, 0, 0, "Error: %s", msg);
+    mvwprintw(stderrw, 0, 0, "%s", msg);
     wrefresh(stderrw);
 }
 
@@ -88,4 +90,27 @@ int wgetAlnumString(WINDOW* win, char *out, int max, char echo){
 
 int getAlnumString(char *out, int max, char echo){
     return wgetAlnumString(stdscr, out, max, echo);
+}
+
+int handleCommand(char* message){
+    char command;
+    char arg[1024];
+    sscanf(message, "/%c %s", &command, arg);
+
+    switch (command){
+        case 'e':{
+            return 1;
+            break;
+        }
+        case 'h':{
+            printerrmsg(stderrw, "Command List: /e for exit, /h for help");
+            return 2;
+            break;
+        }
+        default:{
+            printerrmsg(stderrw, "Unknown Command: Type /h for help");
+            return 0;
+            break;
+        }
+    }
 }
