@@ -119,9 +119,7 @@ int getPassword(char* out, int row){
     }
 
     if(i == MAX_ATTEMPTS) {
-        endwin();
-        printf("Max attempts reached\n");
-        exit(1);
+        return -1;
     }
 
     stderrw != NULL && wclear(stderrw);
@@ -132,7 +130,7 @@ int getPassword(char* out, int row){
 
 }
 
-void getConfirm(char* out, int row, char* password){
+int getConfirm(char* out, int row, char* password){
     char confirm[1024];
     char errormsg[50];
     int i = 0;
@@ -153,9 +151,7 @@ void getConfirm(char* out, int row, char* password){
     }
 
     if(i == MAX_ATTEMPTS) {
-        endwin();
-        printf("Max attempts reached\n");
-        exit(1);
+        return -1;
     }
 
     stderrw != NULL && wclear(stderrw);
@@ -163,20 +159,21 @@ void getConfirm(char* out, int row, char* password){
     strcpy(out, confirm);
     echo();
 
+    return 0;
 }
 
-void loginErrorHandler(LoginError code){
+const char* loginErrorStr(LoginError code){
     switch (code) {
     case LOG_USERNAME_NOT_EXISTS:{
-        printerrmsg(stderrw, "Username not found");
+        return "Username not found";
         break;
     }
     case LOG_WRONG_PASSWORD:{
-        printerrmsg(stderrw, "Wrong password");
+        return "Wrong Password";
         break;
     }
     case REG_USERNAME_ALREDY_EXISTS:{
-        printerrmsg(stderrw, "Username already exists");
+        return "Username already exists";
         break;
     }
     default:

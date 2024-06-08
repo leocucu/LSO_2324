@@ -30,9 +30,19 @@ int sockfd;
 WINDOW* stderrw;
 WINDOW* mainw;
 
-void clearExit(){
+void cleanExit();
+void cleanExitp(const char* message);
+
+void cleanExit(){
     endwin();
     close(sockfd);
+    exit(0);
+}
+
+void cleanExitp(const char* message){
+    endwin();
+    close(sockfd);
+    printf("%s\n", message);
     exit(0);
 }
 
@@ -106,7 +116,9 @@ int main(){
 
             getUsername(username, 0);
             write(sockfd, username, strlen(username));
-            getPassword(password, 1);
+            if(getPassword(password, 1) < 0){
+                cleanExitp("Max attempts reached");
+            }
             write(sockfd, password, strlen(password));
             clear();
             refresh();
@@ -114,7 +126,7 @@ int main(){
             int r = read(sockfd, buffer, BUFFER_SIZE - 1);
             sscanf(buffer, "%d", &res);
             if(res > 0){
-                loginErrorHandler(res);
+                printerrmsg(stderrw, loginErrorStr(res));
             } else {
                 isLogged = true;
                 strcpy(client.username, username);
@@ -132,8 +144,12 @@ int main(){
 
             getUsername(username, 0);
             write(sockfd, username, strlen(username));
-            getPassword(password, 1);
-            getConfirm(confirmp, 2, password);
+            if(getPassword(password, 1) < 0){
+                cleanExitp("Max attempts reached");
+            }
+            if(getConfirm(confirmp, 2, password) < 0){
+                cleanExitp("Max attempts reached");
+            }
             write(sockfd, password, strlen(password));
             clear();
             refresh();
@@ -141,7 +157,7 @@ int main(){
             int r = read(sockfd, buffer, BUFFER_SIZE - 1);
             sscanf(buffer, "%d", &res);
             if(res > 0){
-                loginErrorHandler(res);
+                printerrmsg(stderrw, loginErrorStr(res));
             } else {
                 isLogged = true;
                 strcpy(client.username, username);
@@ -150,7 +166,7 @@ int main(){
         }
         default:
             //  Exit
-            clearExit();
+            cleanExit();
             break;
         }
 
@@ -173,10 +189,12 @@ int main(){
             clear();
             refresh();
 
-            waitInQueue(sockfd);
+            if(waitInQueue(sockfd) > 0){
+                cleanExit();
+            }
         }
         else{
-            clearExit();
+            cleanExit();
         }
 
         //  Start Chatroom

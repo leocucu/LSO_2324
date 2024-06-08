@@ -13,7 +13,7 @@ void reqJoinRoom(int sockfd, int room){
     write(sockfd, command, strlen(command));
 }
 
-void waitInQueue(int sockfd){
+int waitInQueue(int sockfd){
     char res[BUFFER_SIZE];
     int cod;
 
@@ -29,9 +29,9 @@ void waitInQueue(int sockfd){
             refresh();
         }
         else{
-            endwin();
-            close(sockfd);
-            exit(1);
+            return n;
         }
     } while (1);
+
+    return 0;
 }

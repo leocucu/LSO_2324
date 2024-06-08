@@ -51,7 +51,7 @@ int menu(unsigned int chn, const char* chv[]){
     return wmenu(stdscr, chn, chv);
 }
 
-void printerrmsg(WINDOW* stderrw, char* msg){
+void printerrmsg(WINDOW* stderrw, const char* msg){
     wclear(stderrw);
     wrefresh(stderrw);
     mvwprintw(stderrw, 0, 0, "%s", msg);

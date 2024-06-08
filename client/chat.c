@@ -10,6 +10,9 @@ bool getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
     nodelay(win, TRUE);
 
     int ch = wgetch(win);
+    int max = getmaxx(win) - 2;
+    int left = 0;
+
     if (ch != ERR){
         if (ch == '\n' || ch == KEY_ENTER){
             return true;
@@ -21,7 +24,7 @@ bool getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
                 input_buffer[--(*input_len)] = '\0';
             }
         }
-        else if (isprint(ch)){
+        else if (isprint(ch) && (*input_len) < max - 1){
             input_buffer[(*input_len)++] = ch;
             input_buffer[(*input_len)] = '\0';
             mvwaddch(win, 1, 1 + (*input_len), ch);
