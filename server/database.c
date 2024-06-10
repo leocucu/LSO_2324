@@ -6,7 +6,7 @@
 
 sqlite3 *db;
 
-DbError initdb(){
+DbError connectdb(){
     int err;
     if((err = sqlite3_open("mydb.db", &db)) != SQLITE_OK){
         printf("Cant Open DB: %s\n", sqlite3_errstr(err));

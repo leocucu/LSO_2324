@@ -10,7 +10,7 @@ typedef enum{
     DB_CLOSE_FAIL
 } DbError;
 
-DbError initdb();
+DbError connectdb();
 DbError closedb();
 DbError getTranslation(const char* word, char* translation, const char* lan1, const char* lan2);
 

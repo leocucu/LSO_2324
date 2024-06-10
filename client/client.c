@@ -106,6 +106,9 @@ int main(){
 
     do{
         int selected = wmenu(loginMenu, 3, chv);
+        char command[1];
+        command[0] = (char)(selected + '0');
+        write(sockfd, command, 1);
         switch(selected){
         case 0:{
             //  Login
