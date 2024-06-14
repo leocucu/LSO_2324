@@ -9,7 +9,7 @@
 
 void reqJoinRoom(int sockfd, int room){
     char command[BUFFER_SIZE];
-    sprintf(command, "/j %d", room);
+    sprintf(command, "%d", room);
     write(sockfd, command, strlen(command));
 }
 

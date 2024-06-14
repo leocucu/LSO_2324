@@ -179,4 +179,6 @@ const char* loginErrorStr(LoginError code){
     default:
         break;
     }
+
+    return "Login Error";
 }

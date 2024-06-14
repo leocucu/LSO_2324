@@ -56,13 +56,11 @@ void initChatWindows(WINDOW* messageswin, WINDOW* messagesboxwin, WINDOW* inputw
         
     wrefresh(inputwin);
     wrefresh(messagesboxwin);
-    wrefresh(messageswin);
+    // wrefresh(messageswin);
 }
 
-void printMessage(WINDOW* win, char* message, int* currentline){
-    if ((*currentline) == getmaxy(win))
-        (*currentline)--;
+void printMessage(WINDOW* win, char* message, int* currentline, int winrows, int wincols){
     mvwprintw(win, (*currentline), 0, "%s", message);
     (*currentline)++;
-    wrefresh(win);
+    prefresh(win, (*currentline) - winrows, 0, 1, 1, winrows, wincols);
 }

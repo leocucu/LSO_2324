@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include <ncurses.h>
 
@@ -34,12 +35,17 @@ void cleanExit();
 void cleanExitp(const char* message);
 
 void cleanExit(){
+    char buf[BUFFER_SIZE];
+    clear();
+    refresh();
     endwin();
     close(sockfd);
     exit(0);
 }
 
 void cleanExitp(const char* message){
+    clear();
+    refresh();
     endwin();
     close(sockfd);
     printf("%s\n", message);
@@ -108,7 +114,7 @@ int main(){
         int selected = wmenu(loginMenu, 3, chv);
         char command[1];
         command[0] = (char)(selected + '0');
-        write(sockfd, command, 1);
+        if(write(sockfd, command, 1) <= 0) cleanExit();
         switch(selected){
         case 0:{
             //  Login
@@ -118,15 +124,16 @@ int main(){
             int res;
 
             getUsername(username, 0);
-            write(sockfd, username, strlen(username));
+            if(write(sockfd, username, strlen(username)) <= 0) cleanExit();
             if(getPassword(password, 1) < 0){
                 cleanExitp("Max attempts reached");
             }
-            write(sockfd, password, strlen(password));
+            if(write(sockfd, password, strlen(password)) <= 0) cleanExit();
             clear();
             refresh();
 
-            int r = read(sockfd, buffer, BUFFER_SIZE - 1);
+            int r;
+            if((r = read(sockfd, buffer, BUFFER_SIZE - 1)) <= 0) cleanExit();
             sscanf(buffer, "%d", &res);
             if(res > 0){
                 printerrmsg(stderrw, loginErrorStr(res));
@@ -146,18 +153,18 @@ int main(){
             int res;
 
             getUsername(username, 0);
-            write(sockfd, username, strlen(username));
+            if(write(sockfd, username, strlen(username)) <= 0) cleanExit();
             if(getPassword(password, 1) < 0){
                 cleanExitp("Max attempts reached");
             }
             if(getConfirm(confirmp, 2, password) < 0){
                 cleanExitp("Max attempts reached");
             }
-            write(sockfd, password, strlen(password));
+            if(write(sockfd, password, strlen(password)) <= 0) cleanExit();
             clear();
             refresh();
-
-            int r = read(sockfd, buffer, BUFFER_SIZE - 1);
+            int r;
+            if((r = read(sockfd, buffer, BUFFER_SIZE - 1)) <= 0) cleanExit();
             sscanf(buffer, "%d", &res);
             if(res > 0){
                 printerrmsg(stderrw, loginErrorStr(res));
@@ -179,6 +186,8 @@ int main(){
     refresh();
     flushinp();
 
+    printerrmsg(stderrw, "You are logged in");
+
     WINDOW* roomsMenu = newwin(5, col, 0, 0);
 
     do{
@@ -192,7 +201,7 @@ int main(){
             clear();
             refresh();
 
-            if(waitInQueue(sockfd) > 0){
+            if(waitInQueue(sockfd) < 0){
                 cleanExit();
             }
         }
@@ -206,10 +215,11 @@ int main(){
 
         WINDOW *inputwin = newwin(3, col, row - 4, 0);
         WINDOW *messagesboxwin = newwin(row - 6, col, 0, 0);
-        WINDOW *messageswin = newwin(row - 8, col - 2, 1, 1);
+        WINDOW *messageswin = newpad(100, col - 2);
         set_nonblocking(sockfd);
 
         initChatWindows(messageswin, messagesboxwin, inputwin);
+        prefresh(messageswin, 0, 0, 1, 1, row - 8, col - 2);
 
         char message_buffer[BUFFER_SIZE] = {0};
         char input_buffer[BUFFER_SIZE] = {0};
@@ -220,7 +230,7 @@ int main(){
         do{
             //  Read String char by char Non-Blocking Way
             if(getStringNonBlocking(inputwin, input_buffer, &input_len)){
-                write(sockfd, input_buffer, strlen(input_buffer));
+                if(write(sockfd, input_buffer, strlen(input_buffer)) < 0) cleanExit();
                 if(strncmp(input_buffer, "/", 1) == 0){
                     if(handleCommand(input_buffer) == 1) break;
                 }
@@ -231,10 +241,12 @@ int main(){
             }
 
             // Read and print messages from server
-            int n = read(sockfd, message_buffer, sizeof(message_buffer) - 1);
+            int n;
+            if ((n = read(sockfd, message_buffer, sizeof(message_buffer) - 1)) == 0) cleanExit();
+
             if (n > 0) {
                 message_buffer[n] = '\0';
-                printMessage(messageswin, message_buffer, &currentLine);
+                printMessage(messageswin, message_buffer, &currentLine, row - 8, col - 2);
             }
 
         } while(1);
