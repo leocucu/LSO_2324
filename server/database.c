@@ -26,11 +26,9 @@ DbError closedb(){
 }
 
 DbError getTranslation(const char* word, char* translation, const char* lan1, const char* lan2){
-    char sql[] = "SELECT w2.word AS translation "
-                 "FROM translations t "
-                 "JOIN words w1 ON t.word_id = w1.id "
-                 "JOIN words w2 ON t.translation_id = w2.id "
-                 "WHERE w1.word = ? AND w1.language = ? AND w2.language = ?";
+    char sql[] = "SELECT d.translation AS translation "
+                 "FROM dictionary d "
+                 "WHERE d.word = ? AND d.lan1 = ? AND d.lan2 = ?";
     sqlite3_stmt *statement;
 
     int err;
@@ -66,8 +64,8 @@ DbError getTranslation(const char* word, char* translation, const char* lan1, co
     return DB_QUERY_RESULT_EMPTY;
 }
 
-DbError getLogin(const char* username, char* password){
-    char sql[] = "SELECT u.username AS username, u.password AS password FROM users u WHERE u.username = ?";
+DbError getLogin(const char* username, char* password, char* lan){
+    char sql[] = "SELECT u.username AS username, u.password AS password, u.language AS language FROM users u WHERE u.username = ?";
     sqlite3_stmt *statement;
 
     int err;
@@ -83,6 +81,7 @@ DbError getLogin(const char* username, char* password){
 
     if(sqlite3_step(statement) == SQLITE_ROW){
         strcpy(password, (const char*)sqlite3_column_text(statement, 1));
+        strcpy(lan, (const char*)sqlite3_column_text(statement, 2));
         sqlite3_finalize(statement);
         return DB_OK;
     }
@@ -91,10 +90,10 @@ DbError getLogin(const char* username, char* password){
     return DB_QUERY_RESULT_EMPTY;
 }
 
-DbError insertUser(const char* username, const char* password){
-    char sql[] = "INSERT INTO users (username, password) "
+DbError insertUser(const char* username, const char* password, const char* language){
+    char sql[] = "INSERT INTO users (username, password, language) "
                  "VALUES "
-                 "(?, ?)";
+                 "(?, ?, ?)";
     sqlite3_stmt *statement;
 
     int err;
@@ -108,7 +107,12 @@ DbError insertUser(const char* username, const char* password){
         return DB_BIND_PARAMETER_FAIL;
     }
 
-        if((err = sqlite3_bind_text(statement, 2, password, -1, SQLITE_STATIC)) != SQLITE_OK){
+    if((err = sqlite3_bind_text(statement, 2, password, -1, SQLITE_STATIC)) != SQLITE_OK){
+        printf("Cannot Bind parameter: %s\n", sqlite3_errstr(err));
+        return DB_BIND_PARAMETER_FAIL;
+    }
+
+    if((err = sqlite3_bind_text(statement, 3, language, -1, SQLITE_STATIC)) != SQLITE_OK){
         printf("Cannot Bind parameter: %s\n", sqlite3_errstr(err));
         return DB_BIND_PARAMETER_FAIL;
     }
@@ -158,5 +162,24 @@ DbError getRooms(char *languages[], char *names[], int* max_users, int *n_room){
     }
 
     sqlite3_finalize(statement);
-    return DB_QUERY_RESULT_EMPTY;
+    return DB_OK;
+}
+
+DbError getLanguages(char* languages){
+    char sql[] = "SELECT l.language AS language FROM languages l";
+    sqlite3_stmt *statement;
+    languages[0] = '\0';
+
+    int err;
+    if((err = sqlite3_prepare_v2(db, sql, -1, &statement, NULL)) != SQLITE_OK){
+        printf("Failed to prepare statement: %s\n", sqlite3_errmsg(db));
+        return DB_PREPARE_FAIL;
+    }
+
+    while(sqlite3_step(statement) == SQLITE_ROW){
+        strcat(languages, (const char*)sqlite3_column_text(statement, 0));
+    }
+
+    sqlite3_finalize(statement);
+    return DB_OK;
 }

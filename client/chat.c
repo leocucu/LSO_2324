@@ -3,10 +3,12 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
+#include "ncursesUI.h"
 
 #define BUFFER_SIZE 1024
+extern WINDOW* stderrw;
 
-bool getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
+int getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
     nodelay(win, TRUE);
 
     int ch = wgetch(win);
@@ -15,28 +17,47 @@ bool getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
 
     if (ch != ERR){
         if (ch == '\n' || ch == KEY_ENTER){
-            return true;
+            return KEY_ENTER;
         }
         else if (ch == '\b' || ch == KEY_BACKSPACE || ch == 127){
             if ((*input_len) > 0){
-                mvwaddch(win, 1, 1 + (*input_len), ' ');
-                wmove(win, 1, 1 + (*input_len));
-                input_buffer[--(*input_len)] = '\0';
+                if(input_buffer[(*input_len) - 1] < 0){
+                    (*input_len)--;
+                }
+                (*input_len)--;
+
+                input_buffer[(*input_len)] = '\0';
+                wmove(win, 1, 1);
+                wclrtoeol(win);
+                box(win, 0, 0);
+                wrefresh(win);
+                mvwprintw(win, 1, 1, "%s", input_buffer);
             }
         }
-        else if (isprint(ch) && (*input_len) < max - 1){
+        else if (ch == KEY_UP) {
+            return KEY_UP;
+        }
+        else if (ch == KEY_DOWN){
+            return KEY_DOWN;
+        }
+        else if ((*input_len) < max - 1){
             input_buffer[(*input_len)++] = ch;
             input_buffer[(*input_len)] = '\0';
-            mvwaddch(win, 1, 1 + (*input_len), ch);
+            wmove(win, 1, 1);
+            wclrtoeol(win);
+            box(win, 0, 0);
+            wrefresh(win);
+            mvwprintw(win, 1, 1, "%s", input_buffer);
         }
     }
 
-    return false;
+    return -1;
 }
 
 void inputClear(WINDOW* win){
     wclear(win);
     box(win, 0, 0);
+    wmove(win, 1, 1);
     wrefresh(win);
 }
 
@@ -52,7 +73,6 @@ void initChatWindows(WINDOW* messageswin, WINDOW* messagesboxwin, WINDOW* inputw
     box(messagesboxwin, 0, 0);
     refresh();
     wmove(inputwin, 1, 1);
-    leaveok(stdscr, TRUE);
         
     wrefresh(inputwin);
     wrefresh(messagesboxwin);
@@ -62,5 +82,7 @@ void initChatWindows(WINDOW* messageswin, WINDOW* messagesboxwin, WINDOW* inputw
 void printMessage(WINDOW* win, char* message, int* currentline, int winrows, int wincols){
     mvwprintw(win, (*currentline), 0, "%s", message);
     (*currentline)++;
+    for(int i = ((int)(strlen(message) / wincols)); i > 0; i--)
+        (*currentline)++;
     prefresh(win, (*currentline) - winrows, 0, 1, 1, winrows, wincols);
 }

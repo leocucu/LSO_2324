@@ -1,10 +1,25 @@
 #include "utils.h"
+#include "../customerr.h"
+#include "database.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include "clients.h"
+#include "rooms.h"
+
+#define MAX_CLIENTS 10
+
+struct AcceptedClient *clients[MAX_CLIENTS] = {NULL};
+extern struct ChatRoom rooms[];
+
+int loggedClientCount = 0;
+
+//  Socket
 
 int createTCPSocket() {
     return socket(AF_INET,SOCK_STREAM,0);
 }
     
-struct sockaddr_in* createIPAddress(char *ip, int port) {
+struct sockaddr_in* createIPAddress(const char *ip, int port) {
     struct sockaddr_in *address = malloc(sizeof(struct sockaddr_in));
     address->sin_family = AF_INET;
     address->sin_port = htons(port);
@@ -14,113 +29,175 @@ struct sockaddr_in* createIPAddress(char *ip, int port) {
 
 struct AcceptedClient* acceptIncomingConnection(int serverSocketFD) {
     struct sockaddr_in clientAddress;
-    int clientAddressSize = sizeof(struct sockaddr_in);
-    int clientSocketFD = accept(serverSocketFD, &clientAddress, &clientAddressSize);
+    socklen_t clientAddressSize = sizeof(struct sockaddr_in);
+    int clientSocketFD = accept(serverSocketFD, (struct sockaddr*)&clientAddress, &clientAddressSize);
 
     struct AcceptedClient* acceptedSocket = malloc(sizeof(struct AcceptedClient));
     acceptedSocket->address = clientAddress;
     acceptedSocket->acceptedSocketFD = clientSocketFD;
     acceptedSocket->acceptedSuccessfully = clientSocketFD > 0;
-    acceptedSocket->ID_chatRoom = NULL;
-    acceptedSocket->language = NULL;
+    acceptedSocket->chatRoom = NULL;
+
+    for(int i = 0; i < MAX_CLIENTS; i++){
+        if(clients[i] == NULL){
+            clients[i] = acceptedSocket;
+            break;
+        }
+    }
     return acceptedSocket;
 }
 
 void startAcceptingIncomingConnection(int serverSocketFD) {
     while (1) {
-        struct AcceptedSocket *clientSocket = acceptIncomingConnection(serverSocketFD);
+        struct AcceptedClient *clientSocket = acceptIncomingConnection(serverSocketFD);
         manageNewConnectionOnSeparateThread(clientSocket);
     }
 }
 
 void manageNewConnectionOnSeparateThread(struct AcceptedClient *client) {
     pthread_t id;
-    pthread_create(&id,NULL,manageNewConnection,&client);
+    pthread_create(&id,NULL,manageNewConnection, client);
 }
 
-void manageNewConnection(struct AcceptedClient **client) {
+//  Client Handler
+
+void* manageNewConnection(void* args) {
     //login
-    loggedClient[loggedClientCount++] = *client;
-    //accesso alla stanza
-    backEndPrompt(client);
-    //chatRoom
-}
-
-void sendMessageToTheChatRoom(struct AcceptedClient *client, char *message) {
-    for (int i = 0; i < loggedClientCount; i++) {
-        if (loggedClient[i]->acceptedSocketFD != client->acceptedSocketFD) {
-            if (loggedClient[i]->ID_chatRoom == client->ID_chatRoom) {
-                send(loggedClient[i]->acceptedSocketFD,message,strlen(message),0);
-            }
-        }
-    }
-}
-
-void backEndPrompt(struct AcceptedClient **client) {
-    char buffer[8];
-    const char error[] = "Command not found";
-    while (1) {
-        recv((*client)->acceptedSocketFD,buffer,8,0);
-        if (strcmp(buffer, "\\e")) {
-            close((*client)->acceptedSocketFD);
-            free((*client)->address);
-            free(*client);
-            break;
-        }
-        else {
-            //find in the db
-            joinOrWaitForTheSelectedChatRoom(*client);
-        }
-    }
-}
-
-void manageChatRoom(struct AcceptedClient *client) {
+    struct AcceptedClient* client = (struct AcceptedClient*)args;
     char buffer[1024];
-    while(1) {
-        int amountReceived = recv(client->acceptedSocketFD, buffer,1024,0);
-        if (amountReceived < 0) {
+    int n;
+
+    while(1){
+        if((n = read(client->acceptedSocketFD, buffer, 1024)) <= 0) removeClient(client);
+
+        if((int)buffer[0] == '0'){
+            printf("Logging in\n");
+            if(login(client) == LOGIN_OK)
+                break;
+        } else if((int)buffer[0] == '1') {
+            printf("Register in\n");
+            if(registerClient(client) == LOGIN_OK)
+                break;
+        }
+    }
+    //accesso alla stanza
+
+    while(1){
+        if((n = read(client->acceptedSocketFD, buffer, 1024)) <= 0) removeClient(client);
+        buffer[n] = '\0';
+        int room;
+        sscanf(buffer, "%d", &room);
+        printf("client requested room %d, %s\n", room, rooms[room].language);
+        joinOrWaitForTheSelectedChatRoom(client, &(rooms[room]));
+        char msg[2] = {'0', '\0'};
+        if(write(client->acceptedSocketFD, msg, strlen(msg)) <= 0) removeClient(client);
+            
+        sprintf(buffer, "%s joined the room\n", client->username);
+        printf("%s joined the room\n", client->username);
+        sendMessageToTheChatRoom(&(room[rooms]), buffer);
+        manageChatRoom(client, &rooms[room]);
+    }
+
+    return NULL;
+}
+
+void removeClient(struct AcceptedClient *client){
+    printf("Client disconnected\n");
+    if(client->chatRoom != NULL && client->isInQueue){
+        pthread_mutex_lock(&(client->chatRoom->mutex));
+        findAndRemove(&(client->chatRoom->waitingClients), client);
+        pthread_mutex_unlock(&(client->chatRoom->mutex));
+    } else if(client->chatRoom != NULL){
+        leaveChatRoom(client);
+    }
+
+    close(client->acceptedSocketFD);
+    for(int i = 0; i < MAX_CLIENTS; i++){
+        if(client == clients[i]){
+            free(clients[i]);
+            clients[i] = NULL;
+            pthread_exit(NULL);
             break;
         }
-        if (strcmp(buffer,"\\exit")) {
-            client->ID_chatRoom = NULL;
-            //free thread in the queue
-            break;
-        }
-        char **traslatedMessage = traslateMessage(buffer, client->ID_chatRoom->language);
-        sendMessageToTheChatRoom(client,*traslatedMessage);
-        free(*traslatedMessage);
-        free(traslateMessage);
     }
 }
 
-char **traslateMessage(char *message, char *language) {
-    char* token;
-    char* rest = message;
-    char** traslatedMessage = malloc(sizeof(char*));
-    *traslatedMessage = malloc(sizeof(char) * 1024);
+//  Login
+
+int login(struct AcceptedClient* client){
+    int n;
+    char username[1024];
+    char dbpassword[1024];
+    char password[1024];
+    char language[5];
+    char res[1024];
+
+    if((n = read(client->acceptedSocketFD, username, 1024)) <= 0) removeClient(client);
+    username[n] = '\0';
+    printf("%s\n", username);
     
-    while ((token = strtok_r(rest, " ", &rest))) {
-        //traslate token
-        strcat(*traslatedMessage, token);
-        strcat(*traslatedMessage, " ");
+    if((n = read(client->acceptedSocketFD, password, 1024)) <= 0) removeClient(client);
+    password[n] = '\0';
+    printf("%s\n", password);
+
+    // // DÀ SEMPRE OK, SOLO PER TESTING !!!!!!!!!!!!!!!
+    // sprintf(res, "%d", LOGIN_OK);
+    // if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
+    // strcpy(client->username, username);
+    // strcpy(client->language, "IT");
+    // return LOGIN_OK;
+    // // RICORDARTI DI TOGLIERLO !!!!!!!!!!!!!!!!!!!!!!
+
+    if(getLogin((const char*)username, dbpassword, language) != DB_OK){
+        sprintf(res, "%d", LOG_USERNAME_NOT_EXISTS);
+        if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
+        return LOG_USERNAME_NOT_EXISTS;
     }
-    return traslatedMessage;
+
+    if(strcmp(password, dbpassword) == 0){
+        sprintf(res, "%d", LOGIN_OK);
+        if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
+        strcpy(client->username, username);
+        strcpy(client->language, language);
+        return LOGIN_OK;
+    } else {
+        sprintf(res, "%d", LOG_WRONG_PASSWORD);
+        if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
+        return LOG_WRONG_PASSWORD; 
+    }
 }
 
-void joinOrWaitForTheSelectedChatRoom(struct AcceptedClient **client) {
-    pthread_mutex_lock(&((*client)->ID_chatRoom->mutex));
-    if ((*client)->ID_chatRoom->maxClient > 0) {
-        (*client)->ID_chatRoom->maxClient = (*client)->ID_chatRoom->maxClient - 1;
-        pthread_mutex_unlock(&((*client)->ID_chatRoom->mutex));
+int registerClient(struct AcceptedClient* client){
+    int n;
+    char username[1024];
+    char password[1024];
+    char langs[1024] = {0};
+    char language[3];
+    char res[1024];
+
+    if((n = read(client->acceptedSocketFD, username, 1024)) <= 0) removeClient(client);
+    username[n] = '\0';
+
+    if((n = read(client->acceptedSocketFD, password, 1024)) <= 0) removeClient(client);
+    password[n] = '\0';
+
+    if(getLanguages(langs) != DB_OK) removeClient(client);
+
+    if(write(client->acceptedSocketFD, langs, strlen(langs)) <= 0) removeClient(client);
+    if((n = read(client->acceptedSocketFD, language, 3)) <= 0) removeClient(client);
+    language[n] = '\0';
+
+
+    if(insertUser((const char*)username, (const char*)password, (const char*)language) == DB_OK){
+        sprintf(res, "%d", LOGIN_OK);
+        if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
+        strcpy(client->username, username);
+        strcpy(client->language, language);
+        return LOGIN_OK;
+    } else {
+        sprintf(res, "%d", REG_USERNAME_ALREDY_EXISTS);
+        if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
+        return REG_USERNAME_ALREDY_EXISTS; 
     }
-    else {
-        while ((*client)->ID_chatRoom->maxClient < 0) {
-            enqueue((*client)->ID_chatRoom->waitingClients,*client);
-            pthread_cond_wait(&((*client)->ID_chatRoom->cond), &((*client)->ID_chatRoom->mutex));
-        }
-        *client = (struct AcceptedClient*) dequeue((*client)->ID_chatRoom->waitingClients);
-        (*client)->ID_chatRoom->maxClient = (*client)->ID_chatRoom->maxClient + 1;
-        pthread_mutex_unlock(&((*client)->ID_chatRoom->mutex));
-    }
-    manageChatRoom(*client);
 }
+

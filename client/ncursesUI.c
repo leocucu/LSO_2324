@@ -19,7 +19,7 @@ int wmenu(WINDOW *win, unsigned int chn, const char* chv[]){
             if(c == i) {
                 wattron(win, A_REVERSE);
             }
-            mvwprintw(win, i, 0, chv[i]);
+            mvwprintw(win, i, 0, "%s", chv[i]);
             wattroff(win, A_REVERSE);
         }
 
@@ -93,24 +93,17 @@ int getAlnumString(char *out, int max, char echo){
 }
 
 int handleCommand(char* message){
-    char command;
+    char command[10];
     char arg[1024];
-    sscanf(message, "/%c %s", &command, arg);
+    sscanf(message, "/%s %s", command, arg);
 
-    switch (command){
-        case 'e':{
-            return 1;
-            break;
-        }
-        case 'h':{
-            printerrmsg(stderrw, "Command List: /e for exit, /h for help");
-            return 2;
-            break;
-        }
-        default:{
-            printerrmsg(stderrw, "Unknown Command: Type /h for help");
-            return 0;
-            break;
-        }
+    if(strcmp(command, "exit") == 0){
+        return 1;
+    } else if(strcmp(command, "help") == 0){
+        printerrmsg(stderrw, "Command List: /exit for exit, /help for help");
+        return 2;
     }
+
+    printerrmsg(stderrw, "Unknown Command: Type /help for help");
+    return 0;
 }

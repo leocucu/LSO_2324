@@ -4,8 +4,9 @@
 #include <string.h>
 #include <fcntl.h>
 
-
 #define BUFFER_SIZE 1024
+
+extern WINDOW* stderrw;
 
 void reqJoinRoom(int sockfd, int room){
     char command[BUFFER_SIZE];
@@ -22,7 +23,7 @@ int waitInQueue(int sockfd){
         if (n > 0){
             sscanf(res, "%d", &cod);
             if (cod == 0){
-                break;
+                return 1;
             }
 
             mvprintw(0, 0, "You are the %d in line", cod);
