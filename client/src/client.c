@@ -1,8 +1,17 @@
+#ifndef _XOPEN_SOURCE_EXTENDED
+#define _XOPEN_SOURCE_EXTENDED
+#endif
+
+#ifndef NCURSES_WIDECHAR
+#define NCURSES_WIDECHAR 1
+#endif
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <stdbool.h>
 #include <ctype.h>
 #include <errno.h>
@@ -20,10 +29,10 @@
 #define BUFFER_SIZE 1024
 
 #define MIN_ROW 10
-#define MIN_COL 20
+#define MIN_COL 50
 
 struct client{
-    char username[20];
+    char username[MAX_USERNAME_LEN + 1];
     int language;
     int room;
 };
@@ -36,7 +45,6 @@ void cleanExit();
 void cleanExitp(const char* message);
 
 void cleanExit(){
-    char buf[BUFFER_SIZE];
     clear();
     refresh();
     endwin();
@@ -78,12 +86,23 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
+    const char *hostname = getenv("SERVER_IP");
+    if(hostname == NULL){
+        if(inet_pton(AF_INET, SERVER_IP, &servaddr.sin_addr) <= 0) {
+                perror("Invalid address/ Address not supported");
+                exit(EXIT_FAILURE);
+        }
+    } else {
+        struct hostent *server = gethostbyname(hostname);
+        if(server == NULL){
+                perror("Failed to resolve server hostname");
+                exit(EXIT_FAILURE);
+        }
+        memcpy(&servaddr.sin_addr.s_addr, server->h_addr, server->h_length);
+    }
+
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(PORT);
-    if(inet_pton(AF_INET, SERVER_IP, &servaddr.sin_addr) <= 0) {
-        perror("Invalid address/ Address not supported");
-        exit(EXIT_FAILURE);
-    }
 
     // Connect to server
     if(connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
@@ -95,6 +114,7 @@ int main(){
     getmaxyx(stdscr, row, col);
     keypad(stdscr, TRUE);
 
+
     if(row < MIN_ROW || col < MIN_COL){
         close(sockfd);
         endwin();
@@ -102,6 +122,7 @@ int main(){
         exit(1);
     }
 
+    atexit(cleanExit);
 
     mainw = newwin(row - 1, col, 0, 0);
     stderrw = newwin(1, col, row - 1, 0);
@@ -121,24 +142,21 @@ int main(){
         switch(selected){
         case 0:{
             //  Login
-            char username[1024];
-            char password[1024];
-            char buffer[BUFFER_SIZE];
-            int res;
+            char username[MAX_USERNAME_LEN + 1];
+            char password[MAX_USERNAME_LEN + 1];
+            unsigned char res;
 
             getUsername(username, 0);
-            if(write(sockfd, username, strlen(username)) <= 0) cleanExit();
+            if(write(sockfd, username, MAX_USERNAME_LEN + 1) <= 0) exit(1);
             if(getPassword(password, 1) < 0){
                 cleanExitp("Max attempts reached");
             }
-            if(write(sockfd, password, strlen(password)) <= 0) cleanExit();
+            if(write(sockfd, password, MAX_USERNAME_LEN + 1) <= 0) exit(1);
             clear();
             refresh();
 
             int r;
-            if((r = read(sockfd, buffer, BUFFER_SIZE - 1)) <= 0) cleanExit();
-            buffer[r] = '\0';
-            sscanf(buffer, "%d", &res);
+            if((r = read(sockfd, &res, 1)) <= 0) cleanExit();
             if(res > 0){
                 printerrmsg(stderrw, loginErrorStr(res));
             } else {
@@ -150,47 +168,45 @@ int main(){
         }
         case 1:{
             //  Register
-            char username[1024];
-            char password[1024];
-            char confirmp[1024];
+            char username[MAX_USERNAME_LEN + 1];
+            char password[MAX_USERNAME_LEN + 1];
+            char confirmp[MAX_USERNAME_LEN + 1];
             char buffer[1024];
-            int res;
+            unsigned char code;
 
             getUsername(username, 0);
-            if(write(sockfd, username, strlen(username)) <= 0) cleanExit();
+            if(write(sockfd, username, MAX_USERNAME_LEN + 1) <= 0) cleanExit();
+
             if(getPassword(password, 1) < 0){
                 cleanExitp("Max attempts reached");
             }
+
             if(getConfirm(confirmp, 2, password) < 0){
                 cleanExitp("Max attempts reached");
             }
-            if(write(sockfd, password, strlen(password)) <= 0) cleanExit();
-            int r;
 
-            if((r = read(sockfd, buffer, BUFFER_SIZE - 1)) <= 0) cleanExit();
-            buffer[r] = '\0';
-            char* languages[r / 2];
-            for(int i = 0; i < r / 2; i++){
-                languages[i] = malloc(sizeof(char) * 3);
-                languages[i][0] = buffer[2*i];
-                languages[i][1] = buffer[2*i + 1];
-                languages[i][2] = '\0';
-            }
+            if(write(sockfd, password, MAX_USERNAME_LEN + 1) <= 0) cleanExit();
+            int n;
+
+            char **languages;
+            n = getLanguages(&languages, sockfd);
+            if(n < 0) cleanExit();
+
             mvprintw(3, 0, "Select your Language:");
             WINDOW* menu = newwin(row-4, col, 4, 0);
             wrefresh(menu);
             refresh();
-            int ch = wmenu(menu, r / 2, (const char **) languages);
-            if(write(sockfd, languages[ch], strlen(languages[ch])) <= 0) cleanExit();
+            int ch = womenu(menu, n, (const char **) languages);
+
+            if(write(sockfd, languages[ch], 3) <= 0) cleanExit();
             clear();
             refresh();
-            for(int i = 0; i < r / 2; i++){
-                free(languages[i]);
-            }
-            if((r = read(sockfd, buffer, BUFFER_SIZE - 1)) <= 0) cleanExit();
-            sscanf(buffer, "%d", &res);
-            if(res > 0){
-                printerrmsg(stderrw, loginErrorStr(res));
+            freeLanguages(languages, n);
+
+            int r;
+            if((r = read(sockfd, &code, 1)) <= 0) cleanExit();
+            if(code > 0){
+                printerrmsg(stderrw, loginErrorStr(code));
             } else {
                 isLogged = true;
                 strcpy(client.username, username);
@@ -211,14 +227,18 @@ int main(){
 
     printerrmsg(stderrw, "You are logged in");
 
-    WINDOW* roomsMenu = newwin(5, col, 0, 0);
-
     do{
 
         //  Rooms Menu
-        const char *rooms[5] = {"IT", "EN", "FR", "ES", "Exit"};
-        int selected = wmenu(roomsMenu, 5, rooms);
-        if (selected >= 0 && selected < 4){
+        char** rooms;
+        int n = getRooms(&rooms, sockfd);
+        
+        WINDOW* roomsMenu = newwin(n, col, 0, 0);
+        refresh();
+
+        unsigned char selected = (unsigned char)(wmenu(roomsMenu, n, (const char**)rooms));
+
+        if (selected >= 0 && selected < n - 2){
             reqJoinRoom(sockfd, selected);
 
             clear();
@@ -227,8 +247,34 @@ int main(){
             if(waitInQueue(sockfd) < 0){
                 cleanExit();
             }
-        }
-        else{
+        } else if(selected == n - 2){
+            clear();
+            refresh();
+            if(write(sockfd, &selected, 1) <= 0) cleanExit();
+
+            mvprintw(0, 0, "Nome Stanza: ");
+            char nome[MAX_ROOMNAME_LEN + 1];
+            getAlnumString(nome, MAX_ROOMNAME_LEN, 0);
+            if(write(sockfd, nome, MAX_ROOMNAME_LEN + 1) <= 0) cleanExit();
+
+
+            mvprintw(1, 0, "Massimo di Utenti:  ");
+            unsigned char max = (unsigned char)getNum();
+            if(write(sockfd, &max, 1) <= 0) cleanExit();
+
+            mvprintw(2, 0, "Seleziona la lingua:");
+            WINDOW* languagesMenu = newwin(1, col, 3, 0);
+            refresh();
+
+            char **languages;
+            int n = getLanguages(&languages, sockfd);
+            if(n < 0) cleanExit();
+            int c = womenu(languagesMenu, n, (const char **)languages);
+            if(write(sockfd, languages[c], 2) <= 0) cleanExit();
+
+            freeLanguages(languages, n);
+            continue;
+        } else{
             cleanExit();
         }
 
@@ -245,25 +291,29 @@ int main(){
         prefresh(messageswin, 0, 0, 1, 1, row - 8, col - 2);
 
         char message_buffer[BUFFER_SIZE] = {0};
-        char input_buffer[BUFFER_SIZE] = {0};
-        input_buffer[0] = '\0';
+        wint_t input_buffer[BUFFER_SIZE];
+        input_buffer[0] = L'\0';
         int input_len = 0;
         int currentLine = 0;
         int scrollOffset = 0;
         int res;
         flushinp();
 
+        freeRooms(rooms, n);
+
         do{
             //  Read String char by char Non-Blocking Way
             if((res = getStringNonBlocking(inputwin, input_buffer, &input_len)) == KEY_ENTER){
-                if(write(sockfd, input_buffer, strlen(input_buffer)) < 0) cleanExit();
-                if(strncmp(input_buffer, "/", 1) == 0){
-                    if(handleCommand(input_buffer) == 1) break;
+                char msgToSend[BUFFER_SIZE * 4];
+                wcstombs(msgToSend, input_buffer, BUFFER_SIZE * 4);
+                if(write(sockfd, msgToSend, strlen(msgToSend)) < 0) cleanExit();
+                if(strncmp(msgToSend, "/", 1) == 0){
+                    if(handleCommand(msgToSend) == 1) break;
                 }
 
                 inputClear(inputwin);
                 input_len = 0;
-                input_buffer[0] = '\0';
+                input_buffer[0] = L'\0';
             } else if(res == KEY_UP && currentLine >= row - 8 && scrollOffset != (currentLine - (row - 8))) {
                 scrollOffset++;
                 prefresh(messageswin, (currentLine - (row - 8)) - scrollOffset, 0, 1, 1, row - 8, col - 2);

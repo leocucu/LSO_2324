@@ -5,10 +5,10 @@
 #include "queuelst.h"
 #include "clients.h"
 
-#define MAX_ROOMS 5
+#define MAX_ROOMNAME_LEN 20
 
 struct ChatRoom{
-    char name[30];
+    char name[MAX_ROOMNAME_LEN + 1];
     char language[3];
     int maxClient;
     int connected;
@@ -19,10 +19,13 @@ struct ChatRoom{
 };
 
 //  Rooms
-int joinOrWaitForTheSelectedChatRoom(struct AcceptedClient *client, struct ChatRoom *r);
 void initRooms();
+
+int joinOrWaitForTheSelectedChatRoom(struct AcceptedClient *client, struct ChatRoom *r);
 void leaveChatRoom(struct AcceptedClient* client);
 void joinRoom(struct AcceptedClient* client, struct ChatRoom* r);
+int sendRooms(struct AcceptedClient* client);
+void addRoom(const char* name, const char* language, int maxClient);
 
 //  Chat
 void sendMessageToTheChatRoom(struct ChatRoom *r, char *message);

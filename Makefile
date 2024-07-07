@@ -13,8 +13,8 @@ CLIENT_EXEC = client
 SERVER_EXEC =  server
 
 # Librerie necessarie
-CLIENT_LIBS = -lncurses
-SERVER_LIBS = -lsqlite3
+CLIENT_LIBS = -lncursesw
+SERVER_LIBS = -lsqlite3 -lsodium
 
 # Regole per la compilazione
 .PHONY: all clean

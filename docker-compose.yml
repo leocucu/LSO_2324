@@ -1,0 +1,21 @@
+services:
+  server:
+    build:
+      context: ./
+      dockerfile: server/Dockerfile
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./server/database/mydb.db:/server/database/mydb.db
+    tty: true
+  client:
+    build:
+      context: ./
+      dockerfile: client/Dockerfile
+      args:
+        - LCL=${LANG}
+    environment:
+      - SERVER_IP=server
+      - LANG=${LANG}
+    tty: true
+    stdin_open: true

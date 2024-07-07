@@ -1,8 +1,10 @@
 #ifndef LOGIN_H
 #define LOGIN_H
 
-#include <ncurses.h>
-#include "../customerr.h"
+#include <stdbool.h>
+#include "customerr.h"
+
+#define MAX_USERNAME_LEN 20
 
 bool validateUsername(char* username, char* errormsg);
 bool validatePassword(char* password, char* errormsg);

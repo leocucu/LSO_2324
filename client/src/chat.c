@@ -1,3 +1,11 @@
+#ifndef NCURSES_WIDECHAR
+#define NCURSES_WIDECHAR 1
+#endif
+
+#ifndef _XOPEN_SOURCE_EXTENDED
+#define _XOPEN_SOURCE_EXTENDED
+#endif
+
 #include <stdlib.h>
 #include <ncurses.h>
 #include <unistd.h>
@@ -8,30 +16,28 @@
 #define BUFFER_SIZE 1024
 extern WINDOW* stderrw;
 
-int getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
+int getStringNonBlocking(WINDOW* win, wint_t* input_buffer, int* input_len){
     nodelay(win, TRUE);
+    wint_t ch;
 
-    int ch = wgetch(win);
+    int code = wget_wch(win, &ch);
     int max = getmaxx(win) - 2;
     int left = 0;
 
-    if (ch != ERR){
+    if (code != ERR){
         if (ch == '\n' || ch == KEY_ENTER){
             return KEY_ENTER;
         }
         else if (ch == '\b' || ch == KEY_BACKSPACE || ch == 127){
             if ((*input_len) > 0){
-                if(input_buffer[(*input_len) - 1] < 0){
-                    (*input_len)--;
-                }
                 (*input_len)--;
 
-                input_buffer[(*input_len)] = '\0';
+                input_buffer[(*input_len)] = L'\0';
                 wmove(win, 1, 1);
                 wclrtoeol(win);
-                box(win, 0, 0);
+                box(win, ACS_VLINE, ACS_HLINE);
+                mvwaddwstr(win, 1, 1, input_buffer);
                 wrefresh(win);
-                mvwprintw(win, 1, 1, "%s", input_buffer);
             }
         }
         else if (ch == KEY_UP) {
@@ -40,17 +46,16 @@ int getStringNonBlocking(WINDOW* win, char* input_buffer, int* input_len){
         else if (ch == KEY_DOWN){
             return KEY_DOWN;
         }
-        else if ((*input_len) < max - 1){
+        else if (((*input_len) < max - 1) && (code != KEY_CODE_YES)){
             input_buffer[(*input_len)++] = ch;
-            input_buffer[(*input_len)] = '\0';
+            input_buffer[(*input_len)] = L'\0';
             wmove(win, 1, 1);
             wclrtoeol(win);
             box(win, 0, 0);
+            mvwaddwstr(win, 1, 1, input_buffer);
             wrefresh(win);
-            mvwprintw(win, 1, 1, "%s", input_buffer);
         }
     }
-
     return -1;
 }
 

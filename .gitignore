@@ -1,8 +1,4 @@
 /client/client
 /server/server
-/server/dbtest
-/server/dbtest.c
-/server/myserver.c
-/server/myserver
-/server/dictionary
 .DS_Store
+/.vscode

@@ -1,0 +1,1 @@
+gcc -o server src/*.c -I../include -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium -lsqlite3

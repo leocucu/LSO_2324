@@ -13,11 +13,13 @@ typedef enum{
 
 DbError connectdb();
 DbError closedb();
+
 DbError getTranslation(const char* word, char* translation, const char* lan1, const char* lan2);
 DbError getLogin(const char* username, char* password, char* language);
 DbError insertUser(const char* username, const char* password, const char* language);
 DbError getRoomsCount(int* count);
-DbError getRooms(char *languages[], char *names[], int* max_users, int *n_room);
+DbError getRooms(char *languages[], char *names[], int* max_users);
+DbError insertRoom(const char* name, const char* lang, int max);
 DbError getLanguages(char* languages);
 
 #endif

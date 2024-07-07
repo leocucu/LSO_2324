@@ -8,7 +8,7 @@ sqlite3 *db;
 
 DbError connectdb(){
     int err;
-    if((err = sqlite3_open("mydb.db", &db)) != SQLITE_OK){
+    if((err = sqlite3_open("database/mydb.db", &db)) != SQLITE_OK){
         printf("Cant Open DB: %s\n", sqlite3_errmsg(db));
         return DB_CONNECT_FAIL;
     }
@@ -143,7 +143,7 @@ DbError getRoomsCount(int* count){
     return DB_OK;
 }
 
-DbError getRooms(char *languages[], char *names[], int* max_users, int *n_room){
+DbError getRooms(char *languages[], char *names[], int* max_users){
     char sql[] = "SELECT r.name AS name, r.language AS language, r.max AS max FROM rooms r";
     sqlite3_stmt *statement;
     int n = 0;
@@ -163,6 +163,42 @@ DbError getRooms(char *languages[], char *names[], int* max_users, int *n_room){
 
     sqlite3_finalize(statement);
     return DB_OK;
+}
+
+DbError insertRoom(const char* name, const char* lang, int max){
+    char sql[] = "INSERT INTO rooms (name, language, max) "
+                 "VALUES "
+                 "(?, ?, ?)";
+    sqlite3_stmt *statement;
+
+    int err;
+    if((err = sqlite3_prepare_v2(db, sql, -1, &statement, NULL)) != SQLITE_OK){
+        printf("Failed to prepare statement: %s\n", sqlite3_errstr(err));
+        return DB_PREPARE_FAIL;
+    }
+
+    if((err = sqlite3_bind_text(statement, 1, name, -1, SQLITE_STATIC)) != SQLITE_OK){
+        printf("Cannot Bind parameter: %s\n", sqlite3_errstr(err));
+        return DB_BIND_PARAMETER_FAIL;
+    }
+
+    if((err = sqlite3_bind_text(statement, 2, lang, -1, SQLITE_STATIC)) != SQLITE_OK){
+        printf("Cannot Bind parameter: %s\n", sqlite3_errstr(err));
+        return DB_BIND_PARAMETER_FAIL;
+    }
+
+    if((err = sqlite3_bind_int(statement, 3, max)) != SQLITE_OK){
+        printf("Cannot Bind parameter: %s\n", sqlite3_errstr(err));
+        return DB_BIND_PARAMETER_FAIL;
+    }
+
+    if(sqlite3_step(statement) == SQLITE_DONE){
+        sqlite3_finalize(statement);
+        return DB_OK;
+    }
+
+    sqlite3_finalize(statement);
+    return DB_INSERT_FAIL;
 }
 
 DbError getLanguages(char* languages){

@@ -9,14 +9,13 @@
     #include <string.h>
     #include "queuelst.h"
 
-    #define MAX_ROOMS 5
-
     //  Socket
     int createTCPSocket();
     struct sockaddr_in* createIPAddress(const char *ip, int port);    
     struct AcceptedClient* acceptIncomingConnection(int serverSocketFD);
     void startAcceptingIncomingConnection(int serverSocketFD);
     void manageNewConnectionOnSeparateThread(struct AcceptedClient *client);
+    void setTimeoutOnSocket(int sock, int seconds);
 
     //  Client Handler
     void* manageNewConnection(void* args);

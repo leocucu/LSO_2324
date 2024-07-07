@@ -1,9 +1,9 @@
 #include "login.h"
-#include "ncursesUI.h"
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "ncursesUI.h"
 
 #define MAX_ATTEMPTS 5
 
@@ -71,7 +71,7 @@ bool validateConfirm(char* password1, char*  password2, char* errormsg){
 
 int getUsername(char* out, int row){
     echo();
-    char username[1024];
+    char username[MAX_USERNAME_LEN + 1];
     char errormsg[50];
     int len;
 
@@ -79,7 +79,7 @@ int getUsername(char* out, int row){
         move(row, 0);
         clrtoeol();
         printw("Username: ");
-        len = getAlnumString(username, 25, 0);
+        len = getAlnumString(username, MAX_USERNAME_LEN, 0);
         if(len == 0){
             printerrmsg(stderrw, "Empty Username");
         }else if (validatePassword(username, errormsg)){
@@ -98,7 +98,7 @@ int getUsername(char* out, int row){
 }
 
 int getPassword(char* out, int row){
-    char password[1024];
+    char password[MAX_USERNAME_LEN + 1];
     char errormsg[50];
     int i = 0;
     int len;
@@ -108,7 +108,7 @@ int getPassword(char* out, int row){
         move(row, 0);
         clrtoeol();
         printw("Password: ");
-        len = getAlnumString(password, 20, '*');
+        len = getAlnumString(password, MAX_USERNAME_LEN, '*');
         if(len == 0){
             printerrmsg(stderrw, "Empty Password");
         }else if (validatePassword(password, errormsg)){
@@ -131,7 +131,7 @@ int getPassword(char* out, int row){
 }
 
 int getConfirm(char* out, int row, char* password){
-    char confirm[1024];
+    char confirm[MAX_USERNAME_LEN + 1];
     char errormsg[50];
     int i = 0;
 
@@ -140,7 +140,7 @@ int getConfirm(char* out, int row, char* password){
         move(row, 0);
         clrtoeol();
         printw("Confirm Password: ");
-        int len = getAlnumString(confirm, 20, '*');
+        int len = getAlnumString(confirm, MAX_USERNAME_LEN, '*');
         if(len == 0){
             printerrmsg(stderrw, "Empty Password");
         }else if (validateConfirm(password, confirm, errormsg)){
