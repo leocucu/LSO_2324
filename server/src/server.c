@@ -32,7 +32,7 @@ int main(){
 
     listen(serverSocketFD,10);
     initRooms();
-    
+
     printf("Server listening on port %d\n", PORT);
     startAcceptingIncomingConnection(serverSocketFD);
 

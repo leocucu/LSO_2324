@@ -17,5 +17,6 @@ services:
     environment:
       - SERVER_IP=server
       - LANG=${LANG}
+      - TERM=${TERM}
     tty: true
     stdin_open: true

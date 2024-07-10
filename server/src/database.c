@@ -28,7 +28,7 @@ DbError closedb(){
 DbError getTranslation(const char* word, char* translation, const char* lan1, const char* lan2){
     char sql[] = "SELECT d.translation AS translation "
                  "FROM dictionary d "
-                 "WHERE d.word = ? AND d.lan1 = ? AND d.lan2 = ?";
+                 "WHERE LOWER(d.word) = LOWER(?) AND d.lan1 = ? AND d.lan2 = ?";
     sqlite3_stmt *statement;
 
     int err;

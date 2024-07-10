@@ -194,14 +194,6 @@ int login(struct AcceptedClient* client){
     
     if((n = read(client->acceptedSocketFD, password, MAX_USERNAME_LEN + 1)) <= 0) removeClient(client);
 
-    // // DÀ SEMPRE OK, SOLO PER TESTING !!!!!!!!!!!!!!!
-    // sprintf(res, "%d", LOGIN_OK);
-    // if(write(client->acceptedSocketFD, res, strlen(res)) <= 0) removeClient(client);
-    // strcpy(client->username, username);
-    // strcpy(client->language, "IT");
-    // return LOGIN_OK;
-    // // RICORDARTI DI TOGLIERLO !!!!!!!!!!!!!!!!!!!!!!
-
     if(getLogin((const char*)username, dbpassword, language) != DB_OK){
         res = (unsigned char)LOG_USERNAME_NOT_EXISTS;
         if(write(client->acceptedSocketFD, &res, 1) <= 0) removeClient(client);
