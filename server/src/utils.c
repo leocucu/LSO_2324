@@ -68,7 +68,7 @@ void manageNewConnectionOnSeparateThread(struct AcceptedClient *client) {
 
 void setTimeoutOnSocket(int sock, int seconds){
     struct timeval timeout;
-    timeout.tv_sec = seconds;  // Imposta il timeout a 10 secondi
+    timeout.tv_sec = seconds;  // Imposta il timeout a seconds (0 annulla il timeout)
     timeout.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
 }
@@ -88,11 +88,11 @@ void* manageNewConnection(void* args) {
         if((n = read(client->acceptedSocketFD, buffer, 1024)) <= 0) removeClient(client);
 
         if((int)buffer[0] == '0'){
-            printf("Logging in\n");
+            printf("a Client is Logging in\n");
             if(login(client) == LOGIN_OK)
                 break;
         } else if((int)buffer[0] == '1') {
-            printf("Register in\n");
+            printf("a new client is Registering\n");
             if(registerClient(client) == LOGIN_OK)
                 break;
         }
@@ -101,7 +101,6 @@ void* manageNewConnection(void* args) {
     //  Rooms Manager
     while(1){
         int roomn = sendRooms(client);
-        printf("stanze inviate\n");
 
         unsigned char ch;
         if((n = read(client->acceptedSocketFD, &ch, 1)) <= 0) removeClient(client);
@@ -114,7 +113,6 @@ void* manageNewConnection(void* args) {
             struct ChatRoom* r = rooms[ch];
             pthread_rwlock_unlock(&rooms_global_lock);
 
-            printf("%s requested room %s, %s\n", client->username, r->name, r->language);
             joinOrWaitForTheSelectedChatRoom(client, r);
             unsigned char msg = 0;
             if(write(client->acceptedSocketFD, &msg, 1) <= 0) removeClient(client);
@@ -165,13 +163,12 @@ void removeClient(struct AcceptedClient *client){
         findAndRemove(&(client->chatRoom->waitingClients), client);
         pthread_mutex_unlock(&(client->chatRoom->mutex));
     } else if(client->chatRoom != NULL){
-        printf("Faccio uscire dalla stanza\n");
         leaveChatRoom(client);
     }
 
     close(client->acceptedSocketFD);
     for(int i = 0; i < MAX_CLIENTS; i++){
-        if(client == clients[i]){
+        if(clients[i] != NULL && client == clients[i]){
             free(clients[i]);
             clients[i] = NULL;
             pthread_exit(NULL);

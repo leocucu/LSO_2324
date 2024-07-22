@@ -129,6 +129,7 @@ int main(){
 
     //  Login o Registrazione
     WINDOW* loginMenu = newwin(3, col, 0, 0);
+    refresh();
 
     
     const char* chv[] = {"Login", "Register", "Exit"};

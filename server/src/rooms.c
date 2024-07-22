@@ -57,13 +57,13 @@ void initRooms(){
 int joinOrWaitForTheSelectedChatRoom(struct AcceptedClient *client, struct ChatRoom *r) {
     pthread_mutex_lock(&(r->mutex));
     char buffer[1024];
-    printf("%s vuole entrare in %s, connected: %d, max: %d\n", client->username, r->name, r->connected, r->maxClient);
+    printf("%s required access to room %s\n", client->username, r->name);
     client->chatRoom = r;
     if (r->connected < r->maxClient && r->waitingClients.head == NULL) {
         joinRoom(client, r);
     }
     else {
-        printf("%s si mette in coda\n", client->username);
+        printf("%s is waiting in queue\n", client->username);
         client->isInQueue = 1;
         enqueue(&(r->waitingClients), client);
         unsigned char turn = (unsigned char)r->waitingClients.size;
@@ -129,7 +129,7 @@ void addRoom(const char* name, const char* language, int maxClient){
 
     pthread_mutex_init(&(rooms[curr_rooms]->mutex), NULL);
     pthread_cond_init(&(rooms[curr_rooms]->cond), NULL);
-    printf("Room %s %s, max: %d, connected: %d\n", rooms[curr_rooms]->name, rooms[curr_rooms]->language, rooms[curr_rooms]->maxClient, rooms[curr_rooms]->connected);
+    printf("Added room %s %s, max: %d, connected: %d\n", rooms[curr_rooms]->name, rooms[curr_rooms]->language, rooms[curr_rooms]->maxClient, rooms[curr_rooms]->connected);
     curr_rooms++;
 
     insertRoom(name, language, maxClient);
@@ -209,7 +209,6 @@ void traslateMessage(char *message, char*translated, const char *lan1, const cha
     char* rest = message;
     char* rest2;
     strcpy(translated, "");
-    printf("Traduco %s da %s a %s\n", message, lan1, lan2);
     
     while ((token = strtok_r(rest, " '", &rest))) {
         //traslate token
